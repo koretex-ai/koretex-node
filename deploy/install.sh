@@ -147,9 +147,15 @@ elif [ -n "$FITTING" ] && [ -r /dev/tty ]; then
   done <<EOF
 $FITTING
 EOF
-  echo "  (you can add more anytime after setup with:  koretex models)"
-  printf "  Choose a model [1]: "; read -r PICK < /dev/tty || PICK=1
-  MODEL="$(echo "$TAGS" | tr ' ' '\n' | sed -n "${PICK:-1}p")"
+  echo "  These are just suggestions — you can serve ANY model: type its Ollama tag"
+  echo "  (e.g. llama3.2:1b) or a HuggingFace GGUF (hf.co/<org>/<repo>:<QUANT>)."
+  echo "  (add more anytime after setup with:  koretex models)"
+  printf "  Choose a number, or paste any model tag [1]: "; read -r PICK < /dev/tty || PICK=1
+  PICK="${PICK:-1}"
+  case "$PICK" in
+    ''|*[!0-9]*) MODEL="$PICK" ;;                                   # non-numeric → treat as a literal model tag
+    *)           MODEL="$(echo "$TAGS" | tr ' ' '\n' | sed -n "${PICK}p")" ;;
+  esac
   [ -z "$MODEL" ] && MODEL="$(echo "$TAGS" | tr ' ' '\n' | sed -n '1p')"
 else
   MODEL="$(printf '%s\n' "$FITTING" | head -1 | cut -d'|' -f1)"

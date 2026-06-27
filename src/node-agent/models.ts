@@ -2,7 +2,9 @@
 //
 //   koretex models            interactive picker: shows what fits this Mac, pull the ones you want
 //   koretex models ls         list installed models + what else this Mac can run
-//   koretex models add <tag…> pull one or more models from the catalog
+//   koretex models add <tag…> pull one or more models — ANY Ollama tag or hf.co/* GGUF, not just
+//                             our catalog. After a pull we show what it earns and (if it isn't
+//                             priced yet) let you suggest a price for the operator.
 //   koretex models rm  <tag…> delete one or more models
 //
 // Pulls go through the SAME managed engine the agent serves from (POST /api/pull), so a model is
@@ -13,6 +15,7 @@ import { execSync } from "node:child_process";
 import os from "node:os";
 import readline from "node:readline/promises";
 import { stdin, stdout } from "node:process";
+import { loadIdentity } from "./identity.js";
 
 const ENGINE_URL = process.env.ENGINE_URL ?? "http://127.0.0.1:11434";
 // HTTPS dispatcher (the `koretex` wrapper sets KORETEX_DISPATCHER; fall back to prod).
@@ -76,6 +79,75 @@ async function installedModels(): Promise<string[]> {
   } catch {
     return [];
   }
+}
+
+interface Rate {
+  creditsPerMTok: number;
+  usdPerMTok: number;
+  pointsWeight: number;
+  priced: boolean; // false → currently billed at the default rate
+  defaultCreditsPerMTok: number;
+  creditsPerUsdc: number;
+}
+
+/** What a model pays right now (works for ANY tag, incl. off-catalog — the dispatcher falls back to
+ *  the default rate). Lets a provider see earnings before/after pulling a model that isn't listed. */
+async function rateFor(tag: string): Promise<Rate | null> {
+  try {
+    const r = await fetch(`${DISPATCHER}/models/rate?tag=${encodeURIComponent(tag)}`);
+    if (!r.ok) return null;
+    return (await r.json()) as Rate;
+  } catch {
+    return null;
+  }
+}
+
+/** Send the operator a suggested price for a model (advisory — it keeps earning the current/default
+ *  rate until an admin sets it; the suggestion shows up on the network's Demand tab). */
+async function proposePrice(tag: string, creditsPerMTok: number): Promise<boolean> {
+  try {
+    const wallet = loadIdentity()?.address ?? "";
+    const r = await fetch(`${DISPATCHER}/models/propose-price`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model: tag, creditsPerMTok, wallet }),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** After pulling a model, show what it earns and — if it has no set price yet — let the provider
+ *  suggest one (only when we have a terminal to prompt on). */
+async function afterAdd(tag: string, canPrompt: boolean): Promise<void> {
+  const rate = await rateFor(tag);
+  if (!rate) return;
+  const usd = (c: number) => `$${(c / rate.creditsPerUsdc).toFixed(2)}/1M`;
+  stdout.write(
+    `  💰 ${tag} earns ${usd(rate.creditsPerMTok)} · ×${rate.pointsWeight.toFixed(2)} pts` +
+      (rate.priced ? " (set price)\n" : ` (default rate — no set price yet)\n`),
+  );
+  if (rate.priced || !canPrompt) return;
+  // Unpriced → offer to suggest a price. Purely advisory.
+  const rl = readline.createInterface({ input: stdin, output: stdout });
+  const ans = (await rl.question(
+    `     Suggest a price per 1M tokens? Enter a $ amount (e.g. 0.80), or press Enter to skip: `,
+  )).trim();
+  rl.close();
+  if (!ans) return;
+  const dollars = Number(ans.replace(/^\$/, ""));
+  if (!(dollars > 0)) {
+    stdout.write("     (not a number — skipped)\n");
+    return;
+  }
+  const credits = Math.round(dollars * rate.creditsPerUsdc);
+  const ok = await proposePrice(tag, credits);
+  stdout.write(
+    ok
+      ? `     ✓ Suggested $${dollars.toFixed(2)}/1M. It earns the default until an operator sets it; your request shows on the Demand page.\n`
+      : `     ✗ Couldn't send the suggestion (network?). You can retry later.\n`,
+  );
 }
 
 const pays = (m: CatalogRow) =>
@@ -191,12 +263,21 @@ async function listAll(): Promise<void> {
     stdout.write(`\nIn the catalog but need a bigger Mac:\n`);
     tooBig.forEach((m) => stdout.write(`  · ${m.tag.padEnd(22)} needs ${m.minRamGb}GB / ${m.sizeGb + 10}GB free\n`));
   }
-  stdout.write("\n");
+  stdout.write(`\nThe list above is just our suggestions — you can serve ANY model:\n`);
+  stdout.write(`  koretex models add <ollama-tag>            e.g. koretex models add llama3.2:1b\n`);
+  stdout.write(`  koretex models add hf.co/<org>/<repo>:<QUANT>   (any HuggingFace GGUF)\n`);
+  stdout.write(`We'll show what it earns, and you can suggest a price if it isn't priced yet.\n\n`);
 }
 
 async function addTags(tags: string[]): Promise<void> {
   let changed = false;
-  for (const t of tags) if (await pull(t)) changed = true;
+  const canPrompt = !!stdin.isTTY;
+  for (const t of tags) {
+    if (await pull(t)) {
+      changed = true;
+      await afterAdd(t, canPrompt); // show earnings; offer to suggest a price if unpriced
+    }
+  }
   if (changed) nudgeAgent();
 }
 
@@ -221,20 +302,25 @@ async function interactive(): Promise<void> {
   stdout.write(`  ×pts = points multiplier · $/1M = what you earn — higher = prioritize.\n`);
   choices.sort((a, b) => b.pointsWeight - a.pointsWeight); // highest-paying first
   choices.forEach((m, i) => stdout.write(`  ${String(i + 1).padStart(2)}) ${fmtRow(m)}\n`));
+  stdout.write(`\n  You're not limited to this list — you can serve ANY model. Type its Ollama tag\n`);
+  stdout.write(`  (e.g. \`llama3.2:1b\`) or a HuggingFace GGUF (\`hf.co/<org>/<repo>:<QUANT>\`).\n`);
   const rl = readline.createInterface({ input: stdin, output: stdout });
-  const ans = (await rl.question("\nAdd which? (numbers like `1,3`, or Enter to cancel): ")).trim();
+  const ans = (await rl.question("\nAdd which? (numbers like `1,3`, and/or any model tag — Enter to cancel): ")).trim();
   rl.close();
   if (!ans) {
     stdout.write("Cancelled — nothing changed.\n");
     return;
   }
+  // Each token is either a list number (catalog pick) or a literal model tag (bring-your-own).
   const picks = ans
     .split(/[\s,]+/)
-    .map((n) => Number(n))
-    .filter((n) => Number.isInteger(n) && n >= 1 && n <= choices.length)
-    .map((n) => choices[n - 1].tag);
+    .filter(Boolean)
+    .map((tok) => {
+      const n = Number(tok);
+      return Number.isInteger(n) && n >= 1 && n <= choices.length ? choices[n - 1].tag : tok;
+    });
   if (!picks.length) {
-    stdout.write("No valid choices — nothing changed.\n");
+    stdout.write("Nothing to add.\n");
     return;
   }
   await addTags(picks);
