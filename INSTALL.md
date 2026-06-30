@@ -100,7 +100,7 @@ By default the node runs under your login session and stops when you log out / c
 | Platform | What to do |
 |---|---|
 | **macOS** | Nothing — launchd keeps it running and restarts it at login / on crash. |
-| **Linux / WSL** | `sudo loginctl enable-linger $USER` once — keeps your `systemd --user` services running after logout. |
+| **Linux / WSL** | Installs as a **systemd system service** (runs under PID 1 as your user) — already persistent across logout, no linger needed. Control: `sudo systemctl status|start|stop koretex-node-agent`. *(Older `--user` installs instead need `sudo loginctl enable-linger $USER`.)* |
 | **Windows / WSL (always-on)** | WSL also shuts the Linux VM down when idle or on reboot. Create a Windows **Task Scheduler** task that runs `wsl -d Ubuntu -u root true` (or `wsl ~`) **At log on** / **At startup** so the distro — and, with linger enabled, your node — comes back automatically. |
 
 Bring it back manually anytime: `koretex start` (or `systemctl --user start koretex-ollama koretex-node-agent`).
