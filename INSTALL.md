@@ -114,6 +114,8 @@ Bring it back manually anytime: `koretex start` (or `systemctl --user start kore
 | `koretex: command not found` | Open a new terminal, or run `export PATH="$HOME/.local/bin:$PATH"`. Older installs used `$HOME/.koretex/bin` — check `ls ~/.koretex/bin/koretex` and export that instead. |
 | `'DISPATCHER=…' is not recognized` (Windows) | You're in PowerShell. Run the installer inside **WSL2 Ubuntu** instead. |
 | Node stops when I close the terminal | Linger isn't enabled: `sudo loginctl enable-linger $USER`. On Windows/WSL also add the Task Scheduler entry above. |
+| `systemctl: not found` or an `-ash` / `#` prompt (WSL) | You're in the wrong distro (often `docker-desktop`). Enter Ubuntu: `wsl -d Ubuntu`, and `wsl --set-default Ubuntu` to make it the default. |
+| `Failed to connect to bus` from `systemctl --user` (WSL) | The per-user systemd manager isn't running. 1) Check systemd is PID 1: `ps -p 1 -o comm=` should print `systemd`; if not, enable it (`sudo sh -c 'printf "[boot]\nsystemd=true\n" > /etc/wsl.conf'`, then `wsl --shutdown` in PowerShell and reopen). 2) `sudo loginctl enable-linger $USER`, then `export XDG_RUNTIME_DIR=/run/user/$(id -u)`. Now `systemctl --user …` works. |
 | Stuck at `2/5 Node.js…` | Install Node 20+: `curl -fsSL https://deb.nodesource.com/setup_20.x \| sudo -E bash - && sudo apt-get install -y nodejs`, then re-run. |
 | `This engine needs 'zstd'` at `3/5` | `sudo apt-get install -y zstd` (or `dnf`/`pacman`), then re-run. Re-runs are safe. |
 | Slow / not using my GPU | While serving, `nvidia-smi` should show an `ollama` process. If a model is too big for your VRAM it falls back to CPU — pick a smaller one with `koretex models`. |
