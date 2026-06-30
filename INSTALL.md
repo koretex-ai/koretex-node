@@ -23,45 +23,61 @@ curl -fsSL https://dispatcher.koretex.ai/install | bash
 
 ## macOS (Apple Silicon)
 
-Open **Terminal**, paste the command, done. The node auto-starts (launchd), survives reboots,
-and respawns on crash — no extra steps.
+1. Get your install command: dashboard → **Run a node** → **Login with Google** → copy the one-liner.
+2. Open **Terminal** (⌘-Space, type "Terminal", Enter).
+3. Paste the command, press Enter.
+
+The installer does everything — engine, model, wallet link, auto-start via launchd (survives reboot
+and respawns on crash). If it stops asking for **Node.js**, install it once from
+<https://nodejs.org> (the macOS LTS `.pkg`), then re-run the command.
 
 Requirements the installer checks: macOS 13+, Apple Silicon, 16GB+ unified memory, enough free disk.
 
 ---
 
-## Windows (NVIDIA GPU) — via WSL2
+## Windows + NVIDIA — via WSL2 (Ubuntu)
 
-The installer is a Linux/bash script. Run it inside **WSL2 Ubuntu**, *not* PowerShell.
-(Running it in PowerShell gives `'DISPATCHER=…' is not recognized` — that's the giveaway.)
+You'll run the node inside **WSL2**, a real Ubuntu Linux that uses your NVIDIA GPU. Do everything in
+the **Ubuntu** window — *not* PowerShell (PowerShell gives `'DISPATCHER=…' is not recognized`).
 
-1. **Install WSL2** — in an *admin* PowerShell:
+**Before you start:** update your **NVIDIA driver** (from [nvidia.com](https://www.nvidia.com/Download/index.aspx)
+or GeForce Experience) — that's what exposes the GPU to WSL. No driver is installed *inside* Ubuntu.
+
+1. **Open an admin terminal:** right-click the Start button → **Terminal (Admin)** (or "Windows
+   PowerShell (Admin)").
+
+2. **Install Ubuntu (WSL2):**
    ```powershell
    wsl --install
    ```
-   Reboot, then finish Ubuntu's first-time setup (create a username/password).
+   Reboot when prompted. After reboot an **Ubuntu** window opens and asks you to create a username
+   and password (you'll use the password for `sudo`). If no window opens, launch **Ubuntu** from the
+   Start menu.
 
-2. **Enable systemd** (so the node stays up) — in the **Ubuntu** shell:
+3. **Turn on systemd** (keeps the node running) — in the **Ubuntu** window:
    ```bash
    printf '[boot]\nsystemd=true\n' | sudo tee /etc/wsl.conf
    ```
-   Then in PowerShell: `wsl --shutdown`, and reopen Ubuntu.
+   Then close Ubuntu, run `wsl --shutdown` in PowerShell, and reopen **Ubuntu** from the Start menu.
 
-3. **Confirm the GPU is visible** (no driver install needed inside WSL — the Windows NVIDIA driver
-   exposes it):
+4. **Check the GPU is visible** from Ubuntu — you should see your RTX card:
    ```bash
    nvidia-smi
    ```
 
-4. **Install prerequisites:**
+5. **Install Node 20 + zstd:**
    ```bash
    sudo apt-get update && sudo apt-get install -y zstd
    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs
    ```
 
-5. **Run the install command** (from the Run-a-node tab) inside **Ubuntu**.
+6. **Get your install command:** dashboard → **Run a node** → **Login with Google** → approve the
+   signature → copy the one-line command (it carries your wallet token).
 
-6. **Keep it running** after you close the terminal — see [Keeping your node running](#keeping-your-node-running).
+7. **Paste it into the Ubuntu window** and press Enter. It installs the engine, pulls a model, links
+   your wallet, and starts the node as a systemd **system service** (survives logout).
+
+To also survive a full Windows **reboot**, see [Keeping your node running](#keeping-your-node-running).
 
 ---
 
@@ -74,7 +90,8 @@ The installer is a Linux/bash script. Run it inside **WSL2 Ubuntu**, *not* Power
    ```
    RHEL/Fedora: `sudo dnf install -y zstd nodejs` · Arch: `sudo pacman -S zstd nodejs` — Node must be **20+**.
 2. For an NVIDIA GPU, make sure the driver is installed (`nvidia-smi` works).
-3. Run the install command, then enable linger (next section).
+3. Get your install command from the dashboard (**Run a node** → Login → copy) and run it. It
+   installs as a systemd **system service** (survives logout and reboot) — nothing else to do.
 
 ---
 
