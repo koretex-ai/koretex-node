@@ -70,6 +70,14 @@ Key files this machine writes (all `0600`): `~/.koretex/wallet.json` (the wallet
    ```
    Preserve any existing `model:` settings the user already had as an additional fallback if they want a paid escape hatch (e.g. their old provider after the local one). Do not delete unrelated config.
 
+   Then make an **empty Koretex balance** trigger the local fallback (Koretex returns HTTP `402` when
+   credits run out; by default Hermes does not fail over on `402`):
+   ```
+   hermes config set fallback_on_status "402,429,500,502,503,504"
+   ```
+   New nodes start with welcome credits, so the common path won't hit `402`; this covers the case
+   where the agent spends faster than the machine earns, degrading to the free local model.
+
 4. **Verify** (see below), then **report**: tell the user which model the machine is now serving (earning) and which model the agent now consumes, the wallet address, and the dashboard URL for watching earnings/balance.
 
 ## Pitfalls
@@ -78,7 +86,7 @@ Key files this machine writes (all `0600`): `~/.koretex/wallet.json` (the wallet
 - **The wallet secret (`~/.koretex/wallet.json`) is the only key to this machine's credits.** Tell the user to back it up; losing it loses the balance. Don't regenerate it (don't run `enroll` with `FORCE=1`) unless the user explicitly wants a new identity.
 - **End the Koretex base URL at `/v1`** — Hermes appends the path itself. `openaiBase` is already correct; don't add `/chat/completions`.
 - **`consumeModel` may equal `localModel` on a young network** (few models served). That's fine — as the network grows, re-running the setup or `koretex recommend --json` will pick a larger model.
-- **Balance can run dry** if this agent consumes far more than the machine serves. If inference starts failing with payment/credit errors, the local fallback keeps the agent working for free; suggest the user serve a higher-demand model (`koretex autoserve`) or top up credits on the dashboard.
+- **Balance can run dry** if this agent consumes far more than the machine serves. Koretex returns HTTP `402` when credits hit zero; the `fallback_on_status` setting (step 3) makes Hermes fail over to the free local model so the agent keeps working. Suggest the user serve a higher-demand model (`koretex autoserve`) or top up credits on the dashboard. (Note: some Hermes versions have known bugs where `402` failover doesn't fire reliably — if the agent errors on empty balance instead of falling back, update Hermes or temporarily set the local provider as primary.)
 - **Serving is always-on in this version.** It runs continuously and relies on Koretex's scheduler to route around a busy local node. (Idle-gated serving — only serving when the user isn't using the machine — is on the roadmap.)
 
 ## Verification
