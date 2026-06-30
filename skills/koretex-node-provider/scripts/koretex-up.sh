@@ -86,6 +86,9 @@ if command -v hermes >/dev/null 2>&1; then
     hermes config set model.default "$CONSUME"      >/dev/null 2>&1 || true
     hermes config set model.api_key_env KORETEX_API_KEY >/dev/null 2>&1 || true
     hermes config set model.context_length 65536    >/dev/null 2>&1 || true
+    # Generous OUTPUT cap so reasoning models (which emit a long "thinking" block before the answer)
+    # don't get truncated and stuck in Hermes's continuation loop. It's a ceiling, not a target.
+    hermes config set model.max_tokens 16384        >/dev/null 2>&1 || true
     echo "› Wired Hermes → Koretex (consume model: $CONSUME)."
     echo "  Restart Hermes (quit + relaunch \`hermes\`) to load the new provider — /new alone won't."
   else

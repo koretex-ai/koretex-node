@@ -58,7 +58,7 @@ Files this machine writes (all `0600`): `~/.koretex/wallet.json` (wallet secret 
 - **Config changes need a Hermes RESTART**, not `/new`. Quit and relaunch `hermes`.
 - **Hermes needs ≥64K context.** The script sets `model.context_length 65536` and picks a large network model. If Hermes errors that a model's window is below 64K, the chosen consume model (or the node serving it) is too small — pick a bigger one with `hermes config set model.default <model>` from the network's larger models.
 - **Empty balance → HTTP 402.** New nodes start with welcome credits, so the common path is fine. If the agent out-spends what it earns and inference starts failing with a credit error, have the user serve a higher-demand model (`koretex autoserve`) or top up on the dashboard. (There is no automatic local-model fallback — a small local model can't satisfy Hermes's 64K requirement. If the user wants a safety net, keep their previous provider via `hermes fallback add`.)
-- **Some served models are reasoning models** (output arrives in a `reasoning` field) — Hermes handles these. Avoid models that return empty content.
+- **Some served models are reasoning models** (they emit a long "thinking" block before the answer). The script sets `model.max_tokens 16384` so that thinking doesn't overflow the output cap and trap Hermes in a truncation/continuation loop. If a particular model still truncates, raise it further (`hermes config set model.max_tokens 32768`). Avoid models that return genuinely empty content.
 - **Serving is always-on** in this version (relies on Koretex's scheduler to route around a busy local node). Idle-gated serving is on the roadmap.
 
 ## Verification
