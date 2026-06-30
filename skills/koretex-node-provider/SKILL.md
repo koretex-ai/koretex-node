@@ -22,7 +22,15 @@ The model this machine **serves** (bounded by its RAM) and the model this agent 
 
 ## When to use
 
-Trigger when the user asks to: monetize idle compute / "make my Mac earn", join or set up Koretex, run a provider node, check Koretex credit balance, or have this agent "pay for its own inference" by contributing capacity. Do NOT trigger for ordinary inference requests.
+Trigger when the user asks to: monetize idle compute / "make my Mac earn", join or set up Koretex, run a provider node, **check their Koretex credit balance** ("what's my koretex balance / how many credits do I have"), or have this agent "pay for its own inference" by contributing capacity. Do NOT trigger for ordinary inference requests, and do NOT run `skills list` — act with the commands below.
+
+## Check the credit balance (fast path)
+
+If the user just wants their **Koretex credit balance** ("how many credits do I have", "what's my balance"), do NOT run the full setup. Run this one command and report the result:
+```
+koretex balance
+```
+(or `bash ${HERMES_SKILL_DIR}/scripts/koretex-status.sh` for balance + serving status.) It prints credits and the USD value for this machine's self-custody wallet — which is **not** visible in the web dashboard, so this signed CLI query is the way to read it. If it says "no wallet", the machine isn't enrolled yet → run the setup in the Procedure below.
 
 ## Quick reference
 
