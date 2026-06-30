@@ -4,7 +4,7 @@ description: Turn this machine into a Koretex inference node so it earns credits
 version: 0.2.0
 author: Koretex (koretex-ai)
 license: Apache-2.0
-platforms: [macos, linux]
+platforms: [macos, linux, windows]
 metadata:
   hermes:
     tags: [inference, earnings, provider, koretex, local-models, credits, monetize-idle]
@@ -57,6 +57,34 @@ Files this machine writes (all `0600`): `~/.koretex/wallet.json` (wallet secret 
 2. **Tell the user to restart Hermes.** The config only loads in a **fresh Hermes process** — `quit and relaunch \`hermes\``. `/new` alone does **not** reload it (a new session reuses the running process's startup config).
 
 3. **Report:** the served (earning) model, the consume model now configured, the wallet address, the current balance (from the script / `koretex balance`), and the dashboard URL. Never print the `sk-cust-…` key or the wallet secret — reference them by file path.
+
+## Windows
+
+The Koretex node needs a Linux environment, so on Windows it runs under **WSL2** (the installer supports WSL2 natively; NVIDIA GPUs work for serving via CUDA in WSL2). Pick one of two setups:
+
+**Recommended — run Hermes inside WSL2.** Then this skill works exactly as on Linux:
+1. Install WSL2 + Ubuntu — in an **admin PowerShell**: `wsl --install`, then reboot.
+2. In the **Ubuntu** shell: install Hermes (`curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash`), then this skill (`curl -fsSL https://koretex.ai/skills/koretex-node-provider/install.sh | bash`).
+3. Ask Hermes **"join Koretex and earn while idle"** — `koretex-up.sh` installs the node, enrolls a self-custody wallet, serves, and auto-wires Hermes, all inside WSL2. Identical to the macOS/Linux flow.
+
+**If Hermes must stay on native Windows** (installed via `iex (irm https://hermes-agent.nousresearch.com/install.ps1)`) — the node still runs in WSL2 and you bridge the key/config to native Hermes:
+1. In an **Ubuntu (WSL2)** shell, set up the node headless:
+   ```
+   curl -fsSL https://dispatcher.koretex.ai/install | KORETEX_ENROLL=1 KORETEX_AUTOSERVE=1 bash
+   ```
+   This enrolls a self-custody wallet and starts serving + earning. Check it with `koretex balance` (in WSL2).
+2. Read the spend key from WSL2: `wsl cat ~/.koretex/customer.json` (or open `\\wsl$\Ubuntu\home\<user>\.koretex\customer.json`).
+3. In **native Windows Hermes**, wire it via the CLI (do NOT edit `config.yaml` — Hermes blocks it):
+   ```
+   # put the key in %USERPROFILE%\.hermes\.env as:  KORETEX_API_KEY=sk-cust-…
+   hermes config set model.provider custom
+   hermes config set model.base_url https://dispatcher.koretex.ai/v1
+   hermes config set model.default nemotron-3-nano:30b-a3b-q4_K_M   # any big served model; see `koretex recommend`
+   hermes config set model.api_key_env KORETEX_API_KEY
+   hermes config set model.context_length 65536
+   hermes config set model.max_tokens 16384
+   ```
+   Restart Hermes to load it. Keep the WSL2 node running so it keeps serving + earning.
 
 ## Pitfalls
 
