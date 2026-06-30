@@ -11,6 +11,10 @@ it — nothing here is obfuscated, and this is the same code served by
 curl -fsSL https://dispatcher.koretex.ai/install | bash
 ```
 
+📖 **New to this? See [INSTALL.md](INSTALL.md)** for step-by-step setup on macOS, Windows (WSL2),
+and Linux — plus troubleshooting (Node/zstd, the `koretex` command, keeping the node running, GPU
+checks, custom models).
+
 ## What's in here
 
 | Path | What it does |
