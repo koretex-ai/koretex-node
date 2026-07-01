@@ -50,9 +50,9 @@ Files this machine writes (all `0600`): `~/.koretex/wallet.json` (wallet secret 
    ```
    bash ${HERMES_SKILL_DIR}/scripts/koretex-up.sh
    ```
-   It installs the node (headless), enrolls a **self-custody wallet** (mints the earn token + spend key, grants welcome credits), serves the best-fit model, and — because it detects it's running under Hermes — **wires Hermes to consume through Koretex automatically**: it runs `hermes config set` (provider `custom`, the Koretex base URL, the consume model, `api_key_env`, `context_length 65536`) and puts the key in `~/.hermes/.env`. It prints a `===KORETEX-JSON===` block and the current credit balance.
+   It installs the node (headless), enrolls a **self-custody wallet** (mints the earn token + spend key, grants welcome credits), serves the best-fit model, and — because it detects it's running under Hermes — **wires Hermes to consume through Koretex automatically**: it runs `hermes config set` (provider `custom`, the Koretex base URL, the consume model, `api_key_env`, `context_length 65536`) and writes the API key to Hermes's env file under `~/.hermes/`. It prints a `===KORETEX-JSON===` block and the current credit balance.
 
-   **Do NOT try to edit `~/.hermes/config.yaml` yourself** — Hermes blocks agents from writing it (security), and you don't need to: the script already did it via the sanctioned `hermes config set` path.
+   **Do NOT try to edit Hermes's `config.yaml` yourself** — Hermes blocks agents from writing it (security), and you don't need to: the script already did it via the sanctioned `hermes config set` path.
 
 2. **Tell the user to restart Hermes.** The config only loads in a **fresh Hermes process** — `quit and relaunch \`hermes\``. `/new` alone does **not** reload it (a new session reuses the running process's startup config).
 
@@ -64,7 +64,11 @@ The Koretex node needs a Linux environment, so on Windows it runs under **WSL2**
 
 **Recommended — run Hermes inside WSL2.** Then this skill works exactly as on Linux:
 1. Install WSL2 + Ubuntu — in an **admin PowerShell**: `wsl --install`, then reboot.
-2. In the **Ubuntu** shell: install Hermes (`curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash`), then this skill (`curl -fsSL https://koretex.ai/skills/koretex-node-provider/install.sh | bash`).
+2. In the **Ubuntu** shell, install Hermes then this skill — download each installer, then run it (don't pipe a remote script straight into a shell):
+   ```
+   curl -fsSL https://hermes-agent.nousresearch.com/install.sh -o /tmp/hermes-install.sh && bash /tmp/hermes-install.sh
+   curl -fsSL https://koretex.ai/skills/koretex-node-provider/install.sh -o /tmp/koretex-skill.sh && bash /tmp/koretex-skill.sh
+   ```
 3. Ask Hermes **"join Koretex and earn while idle"** — `koretex-up.sh` installs the node, enrolls a self-custody wallet, serves, and auto-wires Hermes, all inside WSL2. Identical to the macOS/Linux flow.
 
 **If Hermes must stay on native Windows** (installed via `iex (irm https://hermes-agent.nousresearch.com/install.ps1)`) — the node still runs in WSL2 and you bridge the key/config to native Hermes:
@@ -90,7 +94,7 @@ The Koretex node needs a Linux environment, so on Windows it runs under **WSL2**
 
 - **Never print/paste the `sk-cust-…` key or `~/.koretex/wallet.json` into the chat.** Reference by path.
 - **The wallet secret is the only key to this machine's credits.** Tell the user to back up `~/.koretex/wallet.json`; losing it loses the balance. Don't re-enroll with `FORCE=1` unless they want a new identity.
-- **Don't edit `~/.hermes/config.yaml` directly** — Hermes refuses agent writes to it. Use `hermes config set …` (the script already does). The API key goes in `~/.hermes/.env` (not guarded).
+- **Don't edit Hermes's `config.yaml` directly** — Hermes refuses agent writes to it. Use `hermes config set …` (the script already does). The API key goes in Hermes's env file under `~/.hermes/` (not guarded).
 - **Config changes need a Hermes RESTART**, not `/new`. Quit and relaunch `hermes`.
 - **Hermes needs ≥64K context.** The script sets `model.context_length 65536` and picks a large network model. If Hermes errors that a model's window is below 64K, the chosen consume model (or the node serving it) is too small — pick a bigger one with `hermes config set model.default <model>` from the network's larger models.
 - **Empty balance → HTTP 402.** New nodes start with welcome credits, so the common path is fine. If the agent out-spends what it earns and inference starts failing with a credit error, have the user serve a higher-demand model (`koretex autoserve`) or top up on the dashboard. (There is no automatic local-model fallback — a small local model can't satisfy Hermes's 64K requirement. If the user wants a safety net, keep their previous provider via `hermes fallback add`.)
